@@ -1,5 +1,7 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using System.Threading;
 
 namespace Assignment1_Console;
@@ -17,7 +19,21 @@ class Program
     static void CalculateChange(UInt32 remainder, Money[] moneyArray)
     {
         Console.WriteLine("Växel:");
-        Console.WriteLine($"\t\t\t{remainder}");
+
+        int[] maxColumnWidth = new int[3];
+        List<string>[] columns = new List<string>[3];
+        // Add the column headers
+        for (int i = 0; i < 3; i++)
+        {
+            columns[i] = new List<string>();
+        }
+        
+        columns[0].Add("Antal");
+        maxColumnWidth[0] = columns[0][0].Length;
+        columns[1].Add("Valör");
+        maxColumnWidth[1] = columns[1][0].Length;
+        columns[2].Add("Återstående");
+        maxColumnWidth[2] = columns[2][0].Length;
         
         // Loop through the denominations and their associated values
         foreach (Money money in moneyArray)
@@ -28,7 +44,24 @@ class Program
             remainder = (UInt32)remainderTemp;
             
             if (amount == 0) continue;
-            Console.WriteLine($"{amount}\t{money.Denomination}\t{remainder}");
+            // Use .2g format specifier on the amount
+            columns[0].Add($"{amount:N0}");
+            maxColumnWidth[0] = Math.Max(maxColumnWidth[0], columns[0].Last().Length);
+            columns[1].Add(money.Denomination);
+            maxColumnWidth[1] = Math.Max(maxColumnWidth[1], columns[1].Last().Length);
+            columns[2].Add($"{remainder:C0}");
+            maxColumnWidth[2] = Math.Max(maxColumnWidth[2], columns[2].Last().Length);
+        }
+        
+        // Print the columns
+        for (int i = 0; i < columns[0].Count; i++)
+        {
+            Console.Write($"|{columns[0][i].PadRight(maxColumnWidth[0])}");
+            Console.Write(" ");
+            Console.Write($"|{columns[1][i].PadRight(maxColumnWidth[1])}");
+            Console.Write(" ");
+            Console.Write($"|{columns[2][i].PadRight(maxColumnWidth[2])}");
+            Console.WriteLine();
         }
         Console.WriteLine();
     }
@@ -56,10 +89,14 @@ class Program
 
     static void clearAndPrintPrefix()
     {
+        CultureInfo culture = CultureInfo.CurrentCulture;
+        
         Console.Clear();
         Console.WriteLine("".PadLeft(20, '='));
         Console.WriteLine("VäxelSystem");
-        Console.WriteLine("Culture: " + CultureInfo.CurrentCulture.Name);
+        Console.WriteLine($"Culture: {culture.Name}");
+        // Currency symbol gets "kr" for Swedish culture but we do this for SEK
+        Console.WriteLine($"Currency: {(culture.Name == "sv-SE" ? "SEK" : culture.NumberFormat.CurrencySymbol)}");
         Console.WriteLine("".PadLeft(20, '='));
     }
     
@@ -95,7 +132,7 @@ class Program
         {
             clearAndPrintPrefix();
             // Prompt for price
-            while (!promptUInt("Ange pris: ", out price))
+            while (!promptUInt($"Ange pris: ", out price))
             {
                 Console.WriteLine("Felaktig inmatning!");
                 Thread.Sleep(waitingTime);

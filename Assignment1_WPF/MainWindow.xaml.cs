@@ -1,5 +1,9 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Numerics;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices.JavaScript;
 using System.Text;
 using System.Windows;
 using System.Windows.Controls;
@@ -17,9 +21,11 @@ namespace Assignment1_WPF;
 /// <summary>
 /// Interaction logic for MainWindow.xaml
 /// </summary>
+
+
 struct Money
 {
-    public int Value { get; set; }
+    public uint Value { get; set; }
     public string Denomination { get; set; }
 }
 
@@ -40,7 +46,6 @@ public partial class MainWindow : Window
         InitializeComponent();
         _changeFields = new (Money, TextBox)[]
         {
-            new(new Money {Value = 1000, Denomination = "1000-lapp"}, (TextBox)FindName("_1000")),
             new(new Money {Value = 500, Denomination = "500-lapp"}, (TextBox)FindName("_500")),
             new(new Money {Value = 200, Denomination = "200-lapp"}, (TextBox)FindName("_200")),
             new(new Money {Value = 100, Denomination = "100-lapp"}, (TextBox)FindName("_100")),
@@ -53,7 +58,36 @@ public partial class MainWindow : Window
     }
     
     // Helper Functions
-    void CalculateChange(UInt32 remainder)
+    bool IsNumeric(string str)
+    {   
+        HashSet<char> uchars = str.ToHashSet();
+        HashSet<char> digits = new HashSet<char>("0123456789");
+        
+        if (uchars.Except(digits).Any())
+        {
+            return false;
+        }
+        
+        return true;
+    }
+    
+    bool ParseMaxUInt(string str, out UInt32 result, Action<String> callback = null)
+    {
+        bool success = UInt32.TryParse(str, out result);
+        if (!success && IsNumeric(str) && str.Length > 0)
+        {
+            result = UInt32.MaxValue;
+            if (callback != null)
+            {
+                callback(result.ToString());
+            }
+            return true;
+        }
+        
+        return success;
+    }
+    
+    void CalculateChange(UInt32 difference)
     {
         // Return if _changeFields is null
         if (_changeFields == null) return;        
@@ -64,9 +98,9 @@ public partial class MainWindow : Window
         foreach ((Money money, TextBox textBox) in _changeFields)
         {
             // The integer quotient is our change for that denomination
-            int amount = Math.DivRem((int)remainder, money.Value, out int remainderTemp);
+            (UInt32 amount, UInt32 remainder) = UInt32.DivRem(difference, money.Value);
             // And the remainder is what we have left to calculate
-            remainder = (UInt32)remainderTemp;
+            difference = remainder;
             
             if (amount == 0)
             {
@@ -88,16 +122,22 @@ public partial class MainWindow : Window
     // priceField Events
     private void priceField_LostFocus(object sender, RoutedEventArgs e)
     {
-        if (!UInt32.TryParse(priceField.Text, out _))
+        if (!ParseMaxUInt(priceField.Text, out _))
         {
             priceField.Text = _priceFieldPlaceHolder;
         }
     }
+    
+    private void setPriceFieldText(string text)
+    {
+        priceField.Text = text;
+    }
 
     private void priceField_TextChanged(object sender, TextChangedEventArgs e)
     {
-       if (UInt32.TryParse(priceField.Text, out UInt32 price) && UInt32.TryParse(paymentField.Text, out UInt32 payment)
-            && payment > price)
+       if (ParseMaxUInt(priceField.Text, out UInt32 price, setPriceFieldText) &&
+           ParseMaxUInt(paymentField.Text, out UInt32 payment, setPaymentFieldText) &&
+           payment > price)
         {
             CalculateChange(payment - price);
         }
@@ -112,22 +152,28 @@ public partial class MainWindow : Window
 
     private void priceField_GotFocus(object sender, RoutedEventArgs e)
     {
-        priceField.Text = "";
+        if (priceField.Text == _priceFieldPlaceHolder) priceField.Text = "";
     }
 
     // paymentField Events
     private void paymentField_LostFocus(object sender, RoutedEventArgs e)
     {
-        if (!UInt32.TryParse(paymentField.Text, out _))
+        if (!ParseMaxUInt(paymentField.Text, out _))
         {
             paymentField.Text = _paymentFieldPlaceHolder;
         }
     }
-
+    
+    private void setPaymentFieldText(string text)
+    {
+        paymentField.Text = text;
+    }
+    
     private void paymentField_TextChanged(object sender, TextChangedEventArgs e)
     {
-        if (UInt32.TryParse(priceField.Text, out UInt32 price) && UInt32.TryParse(paymentField.Text, out UInt32 payment)
-            && payment > price)
+        if (ParseMaxUInt(paymentField.Text, out UInt32 payment, setPaymentFieldText) && 
+            ParseMaxUInt(priceField.Text, out UInt32 price, setPaymentFieldText) && 
+            payment > price)
         {
             CalculateChange(payment - price);
         }
@@ -142,6 +188,6 @@ public partial class MainWindow : Window
 
     private void paymentField_GotFocus(object sender, RoutedEventArgs e)
     {
-        paymentField.Text = "";
+        if (paymentField.Text == _paymentFieldPlaceHolder) paymentField.Text = "";
     }
 }
