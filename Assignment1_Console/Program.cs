@@ -11,29 +11,41 @@ class Program
     // Struct to hold the denominations and their associated values
     struct Money
     {
-        public int Value { get; set; }
-        public string Denomination { get; set; }
+        public int Value { get; init; }
+        public string Denomination { get; init; }
+    }
+
+    class Column(int capacity = 10)
+    {
+        public List<string> Values { get; set; } = new List<string>(capacity);
+        private int MaxWidth { get; set; } = 0;
+
+        public void Add(string value)
+        {
+            Values.Add(value);
+            MaxWidth = Math.Max(MaxWidth, value.Length);
+        }
+        
+        public string this[int index]
+        {
+            get => Values[index].PadRight(MaxWidth);
+            set {
+                Values[index] = value;
+                MaxWidth = Math.Max(MaxWidth, value.Length);
+            }
+        }
     }
     
-    // UInt32 here again as where working with them in the main function
-    static void CalculateChange(UInt32 remainder, Money[] moneyArray)
+    // uint here again as where working with them in the main function
+    static void CalculateChange(uint remainder, Money[] moneyArray)
     {
         Console.WriteLine("Växel:");
 
-        int[] maxColumnWidth = new int[3];
-        List<string>[] columns = new List<string>[3];
-        // Add the column headers
-        for (int i = 0; i < 3; i++)
-        {
-            columns[i] = new List<string>();
-        }
+        Column[] columns = new Column[3] { new Column(), new Column(), new Column() };
         
         columns[0].Add("Antal");
-        maxColumnWidth[0] = columns[0][0].Length;
         columns[1].Add("Valör");
-        maxColumnWidth[1] = columns[1][0].Length;
         columns[2].Add("Återstående");
-        maxColumnWidth[2] = columns[2][0].Length;
         
         // Loop through the denominations and their associated values
         foreach (Money money in moneyArray)
@@ -41,26 +53,23 @@ class Program
             // The integer quotient is our change for that denomination
             int amount = Math.DivRem((int)remainder, money.Value, out int remainderTemp);
             // And the remainder is what we have left to calculate
-            remainder = (UInt32)remainderTemp;
+            remainder = (uint)remainderTemp;
             
             if (amount == 0) continue;
             // Use .2g format specifier on the amount
             columns[0].Add($"{amount:N0}");
-            maxColumnWidth[0] = Math.Max(maxColumnWidth[0], columns[0].Last().Length);
             columns[1].Add(money.Denomination);
-            maxColumnWidth[1] = Math.Max(maxColumnWidth[1], columns[1].Last().Length);
             columns[2].Add($"{remainder:C0}");
-            maxColumnWidth[2] = Math.Max(maxColumnWidth[2], columns[2].Last().Length);
         }
         
         // Print the columns
-        for (int i = 0; i < columns[0].Count; i++)
+        for (int i = 0; i < columns[0].Values.Count; i++)
         {
-            Console.Write($"|{columns[0][i].PadRight(maxColumnWidth[0])}");
+            Console.Write($"|{columns[0][i]}");
             Console.Write(" ");
-            Console.Write($"|{columns[1][i].PadRight(maxColumnWidth[1])}");
+            Console.Write($"|{columns[1][i]}");
             Console.Write(" ");
-            Console.Write($"|{columns[2][i].PadRight(maxColumnWidth[2])}");
+            Console.Write($"|{columns[2][i]}");
             Console.WriteLine();
         }
         Console.WriteLine();
@@ -71,23 +80,42 @@ class Program
         Console.Out.Write(message);
         return Console.ReadLine();
     }
-
-    static bool promptUInt(string message, out UInt32 result)
+    
+    static bool IsNumeric(string str)
     {
-        string userInput = Program.ReadLine(message) ?? "";
-        result = 0;
-        
-        switch (userInput)
-        {
-            // If castable to double
-            case var _ when UInt32.TryParse(userInput, out result):
-                return true;
-            default:
-                return false;
-        }
+        return System.Text.RegularExpressions.Regex.IsMatch(str, @"^\d+$");
     }
 
-    static void clearAndPrintPrefix()
+    static bool ParseMaxUInt(string str, out UInt32 result, Action<String>? callback = null)
+    {
+        bool success = UInt32.TryParse(str, out result);
+        if (!success && IsNumeric(str) && str.Length > 0)
+        {
+            result = UInt32.MaxValue;
+            if (callback != null)
+            {
+                callback(result.ToString());
+            }
+            return true;
+        }
+        
+        return success;
+    }
+
+    static bool PromptUInt(string message, out uint result)
+    {
+        void OverFlowCallback(string value) => Console.WriteLine($"För stort värde, begränsat till {value}!");
+        string userInput = ReadLine(message) ?? "";
+        result = 0;
+        
+        return userInput switch
+        {
+            _ when ParseMaxUInt(userInput, out result, OverFlowCallback) => true,
+            _ => false
+        };
+    }
+
+    static void ClearAndPrintPrefix()
     {
         CultureInfo culture = CultureInfo.CurrentCulture;
         
@@ -107,11 +135,10 @@ class Program
         // Using a TimeSpan to avoid magic numbers
         TimeSpan waitingTime = TimeSpan.FromSeconds(3);
         
-        clearAndPrintPrefix();
+        ClearAndPrintPrefix();
         
         // Tying values to denominations
-        Money[] moneyArray = new Money[]
-        {
+        Money[] moneyArray = {
             new Money { Value = 500, Denomination = "femhundralappar" },
             new Money { Value = 200, Denomination = "tvåhundralappar" },
             new Money { Value = 100, Denomination = "hundralappar" },
@@ -119,32 +146,31 @@ class Program
             new Money { Value = 20, Denomination = "tjugolappar" },
             new Money { Value = 10, Denomination = "tiokronor" },
             new Money { Value = 5, Denomination = "femkronor" },
-            new Money { Value = 1, Denomination = "enkronor" },
+            new Money { Value = 1, Denomination = "enkronor" }
         };
         
-        // Since we're not dealing with "negative" money, UInt32 is used to reflect this
-        string? userInput;
-        UInt32 price;
-        UInt32 paid;
-        
+        // Since we're not dealing with "negative" money, uint is used to reflect this
+
         bool mainLoop = true;
         while (mainLoop)
         {
-            clearAndPrintPrefix();
+            ClearAndPrintPrefix();
             // Prompt for price
-            while (!promptUInt($"Ange pris: ", out price))
+            uint price;
+            while (!PromptUInt("Ange pris: ", out price))
             {
                 Console.WriteLine("Felaktig inmatning!");
                 Thread.Sleep(waitingTime);
-                clearAndPrintPrefix();
+                ClearAndPrintPrefix();
             }
             
             // Prompt for payment sum
-            while (!promptUInt("Betalt: ", out paid))
+            uint paid;
+            while (!PromptUInt("Betalt: ", out paid))
             {
                 Console.WriteLine("Felaktig inmatning!");
                 Thread.Sleep(waitingTime);
-                clearAndPrintPrefix();
+                ClearAndPrintPrefix();
             }
             
             // If price is greater than paid
@@ -152,29 +178,28 @@ class Program
             {
                 Console.WriteLine("För lite betalt!");
                 Thread.Sleep(waitingTime);
-                clearAndPrintPrefix();
+                ClearAndPrintPrefix();
                 continue;
             }
-            else if (paid == price)
+
+            if (paid == price)
             {
                 Console.WriteLine("Växel:");
                 Console.WriteLine("Ingen växel behövs!");
             }
             else
             {
-                UInt32 remainder = paid - price;
-                Program.CalculateChange(remainder, moneyArray);
+                uint remainder = paid - price;
+                CalculateChange(remainder, moneyArray);
             }
-            
+
             // Continuation prompt
             Console.WriteLine("Fortsätt (j/n)?");
-            userInput = Console.ReadKey().KeyChar.ToString();
-        
-            if (userInput == "n")
-            {
-                Console.Clear();
-                mainLoop = false;
-            }
+            var userInput = Console.ReadKey().KeyChar.ToString();
+
+            if (userInput != "n") continue;
+            Console.Clear();
+            mainLoop = false;
         }
         
         Console.WriteLine("Tryck på valfri tangent för att avsluta...");

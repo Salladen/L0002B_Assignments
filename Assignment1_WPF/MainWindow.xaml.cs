@@ -59,16 +59,8 @@ public partial class MainWindow : Window
     
     // Helper Functions
     bool IsNumeric(string str)
-    {   
-        HashSet<char> uchars = str.ToHashSet();
-        HashSet<char> digits = new HashSet<char>("0123456789");
-        
-        if (uchars.Except(digits).Any())
-        {
-            return false;
-        }
-        
-        return true;
+    {
+        return System.Text.RegularExpressions.Regex.IsMatch(str, @"^\d+$");
     }
     
     bool ParseMaxUInt(string str, out UInt32 result, Action<String> callback = null)
