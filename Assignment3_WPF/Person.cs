@@ -48,40 +48,35 @@ public class Person(string givenName, string surName, string idNum)
     // Do both 21-algo and Control digit check
     private (bool, Gender) IdCheck()
     {
-        // Left shift odd digits
-        string tempIdNum = idNum;
+        string tempIdStr = idNum;
         // Remove the dash if it exists
-        if (tempIdNum.Length == 11)
-        {
-            tempIdNum = tempIdNum.Remove(6, 1);
-        }
+        if (tempIdStr.Length == 11) tempIdStr = tempIdStr.Remove(6, 1);
+        // Left shift odd digits
+        List<int> tempIdNum = tempIdStr.Select(c => int.Parse(c.ToString())).ToList();
         
-        // Add the odd digits
-        int oddSum = 0;
-        int controlSum = 0;
+        // Multiply every other digit by 2
         for (int i = 0; i < 9; i += 2)
         {
-            // Left shift the digit (multiply by 2) before adding
-            oddSum += tempIdNum[i] << 1;
+            // Left shift the digit (multiply by 2)
+            tempIdNum[i] <<= 1;
+            
             // If the result is greater than 10, add the numbers together
-            controlSum += tempIdNum[i] < 10 ? tempIdNum[i] : tempIdNum[i] / 10 + tempIdNum[i] % 10;
+            // -9 is equivalent to the sum of the digits in the range [10, 18]
+            tempIdNum[i] = tempIdNum[i] > 9 ? tempIdNum[i] - 9 : tempIdNum[i];
         }
         
-        // Add even digits
-        int evenSum = 0;
-        for (int i = 1; i < 9; i += 2)
-        {
-            evenSum += tempIdNum[i];
-            controlSum += tempIdNum[i] << 1;
-        }
+        // Skip even number operation because they are all identity operations
         
-        // Add the two sums
-        int sum = oddSum + evenSum;
+        // Calculate the (even, odd) sum
+        int sum = tempIdNum.Sum();
+        // The control sum is the sum without the last digit
+        int controlSum = sum - tempIdNum[9];
+        // The control digit is the number that makes the control sum divisible by 10
         int controlDigit = 10 - (controlSum % 10);
         
         // Check if sum is divisible by 10
         // 9th letter is 3rd birth digit (8th index)
-        Gender gender = int.Parse(tempIdNum[8].ToString()) % 2 == 0 ? Gender.Female : Gender.Male;
-        return (sum % 10 == 0 && controlDigit == int.Parse(tempIdNum[9].ToString()), gender);
+        Gender gender = tempIdNum[8] % 2 == 0 ? Gender.Female : Gender.Male;
+        return (sum % 10 == 0 && controlDigit == tempIdNum[9], gender);
     }
 }
