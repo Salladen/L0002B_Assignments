@@ -1,38 +1,46 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace Assignment2_Console;
 
-class Program
+static class Program
 {
-    class PriorityQueue<T>(Func<T, int> priorityFunction, bool ascending = true, int capacity = 1) 
-        where T : new()
+    class PriorityQueue<T>(Func<T, int> priorityFunction, bool ascending = true, int capacity = 1) : IEnumerable<T>
     {
         private readonly List<T> _list = new (capacity);
         
         private void BinaryInsertion(T value)
         {
+            // Find the index to insert the value at
             (int min, T _) = BinarySearch(value);
-            if (_list.Count < 1)
+                
+            // Insert the value at the index but only if the list is not empty
+            if (_list.Any())
             {
-                _list.Add(value);
+                _list.Insert(min, value);
                 return;
             }
             
-            _list.Insert(min, value);
+            // If the list is empty, just add the value
+            _list.Add(value);
         }
         
-        public (int, T) BinarySearch(T value)
+        private (int, T) BinarySearch(T value)
         {
+            // Assume a search space of the entire list
             int min = 0;
             int max = _list.Count - 1;
             
             // Sign of priority is flipped in case of descending order
             int priority = priorityFunction(value) * (ascending ? 1 : -1);
+            
+            // Halve the search space until we find the index to insert the value at
             while (min < max)
             {
                 int mid = (min + max) / 2;
@@ -41,12 +49,8 @@ class Program
                 if (midPriority < priority) max = mid;
                 else min = mid + 1;
             }
-
-            return min switch
-            {
-                _ when !_list.Any() => (min, new T()),
-                _ => (min, value)
-            };
+            
+            return (min, value);
         }
         
         public void Enqueue(T value) => BinaryInsertion(value);
@@ -59,6 +63,32 @@ class Program
         }
         
         public int Count => _list.Count;
+        
+        public bool Contains(T value)
+        {
+            (int index, T _) = BinarySearch(value);
+            return index < _list.Count && (_list[index]?.Equals(value) ?? false);
+        }
+        
+        public int Where(T value)
+        {
+            (int index, _) = BinarySearch(value);
+            return index;
+        }
+
+        public IEnumerator<T> GetEnumerator()
+        {
+            // Repeated dequeueing will suffice for 'enumerating' a priority queue
+            while (_list.Any())
+            {
+                yield return Dequeue();
+            }
+        }
+
+        IEnumerator IEnumerable.GetEnumerator()
+        {
+            return GetEnumerator();
+        }
     }
     
     readonly struct SalesPerson(string name, string id, string district, int sales)
@@ -101,14 +131,17 @@ class Program
 
         public void Add(string value)
         {
+            // Fill the the columns with empty columns if they are not filled
             while (_columns.Count < ColumnCount)
             {
                 _columns.Add(new Column());
                 _columnWidths.Add(0);
             }
             
+            // Ensure cyclic column selection
             _columnSelector %= ColumnCount;
             
+            // Add the value to the column and update the column width
             _columns[_columnSelector].Add(value);
             _columnWidths[_columnSelector] = Math.Max(_columnWidths[_columnSelector], value.Length);
             _columnSelector++;
@@ -116,9 +149,11 @@ class Program
         
         public void Write()
         {
+            // Opt for a string builder to minimize string operations
             StringBuilder sb = new StringBuilder();
             for (int i = 0; i < _columns[0].Values.Count; i++)
             {
+                // Append all columns for the current row and add padding
                 for (int j = 0; j < ColumnCount; j++)
                 {
                     sb.Append($"{_columns[j][i]}");
@@ -127,6 +162,7 @@ class Program
                 
                 sb.AppendLine();
             }
+            // Concatenate the string builder to a string and write it to the console
             Console.Write(sb.ToString());
         }
     }
@@ -155,21 +191,14 @@ class Program
         for (int i = 0; i < salesTiers.Length; i++)
         {
             int salesTier = salesTiers[i];
-            int salesTierIndex = salesPeoplePq.BinarySearch(new SalesPerson("", "", "", salesTier)).Item1;
-            if (salesTierIndex >= salesPeoplePq.Count)
-            {
-                Console.Write("Index out of range error. Press enter to continue...");
-                Console.ReadLine();
-                salesTierIndex = salesPeoplePq.Count - 1;
-            }
+            int salesTierIndex = salesPeoplePq.Where(new SalesPerson("", "", "", salesTier));
             
             salesTiersIndices[i] = (salesPeoplePq.Count - 1) - salesTierIndex;
         }
         
         int idx = 0;
-        while (salesPeoplePq.Count > 0)
+        foreach (SalesPerson salesPerson in salesPeoplePq)
         {
-            SalesPerson salesPerson = salesPeoplePq.Dequeue();
             columnWriter.Add($"|{salesPerson.Name}");
             columnWriter.Add($"|{salesPerson.Id}");
             columnWriter.Add($"|{salesPerson.District}");
@@ -223,10 +252,10 @@ class Program
     // Simple method to write a message in a specific color
     static void WriteLineInColor(string message, ConsoleColor color)
     {
-        ConsoleColor PrevColor = Console.ForegroundColor;
+        ConsoleColor prevColor = Console.ForegroundColor;
         Console.ForegroundColor = color;
         Console.WriteLine(message);
-        Console.ForegroundColor = PrevColor;
+        Console.ForegroundColor = prevColor;
     }
     
     // This will be something like a header for the program
@@ -260,16 +289,20 @@ class Program
         string userInput = "";
         ClearAndPrintPrefix();
         Console.WriteLine("Lägg till försäljning");
+        
+        // Letting regex patterns be interpreted instead of compiled
+        // we're not using them extensively enough to warrant compilation
+        
         // Capital letter followed by a word or words separated by a space
         // This will match trailing spaces as well
-        string namePattern = @"^(([A-Z])\w* {0,1})+$";
+        Regex namePattern = new Regex(@"^(([A-Z])\w* {0,1})+$", RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
         // 10-12 digits
-        string idPattern = @"^\d{10,12}$";
-        string salesPattern = @"^\d+$";
+        Regex idPattern = new Regex(@"^\d{10,12}$", RegexOptions.CultureInvariant);
+        Regex salesPattern = new Regex(@"^\d+$", RegexOptions.CultureInvariant);
         
         // Loop until: namePattern is matched
         Console.WriteLine();
-        while (!System.Text.RegularExpressions.Regex.IsMatch(userInput, namePattern))
+        while (!namePattern.IsMatch(userInput))
         {
             (int _, int top) = Console.GetCursorPosition();
             Console.SetCursorPosition(0, top - 1);
@@ -281,7 +314,7 @@ class Program
         
         // Loop until: idPattern is matched
         Console.WriteLine();
-        while (!System.Text.RegularExpressions.Regex.IsMatch(userInput, idPattern))
+        while (!idPattern.IsMatch(userInput))
         {
             (int _, int top) = Console.GetCursorPosition();
             Console.SetCursorPosition(0, top - 1);
@@ -306,7 +339,7 @@ class Program
         
         // Loop until: salesPattern is matched
         Console.WriteLine();
-        while (!System.Text.RegularExpressions.Regex.IsMatch(userInput, salesPattern))
+        while (!salesPattern.IsMatch(userInput))
         {
             (int _, int top) = Console.GetCursorPosition();
             Console.SetCursorPosition(0, top - 1);
