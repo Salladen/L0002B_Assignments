@@ -182,4 +182,9 @@ public partial class MainWindow : Window
     {
         if (paymentField.Text == _paymentFieldPlaceHolder) paymentField.Text = "";
     }
+
+    private void Window_Closed(object sender, EventArgs e)
+    {
+
+    }
 }
