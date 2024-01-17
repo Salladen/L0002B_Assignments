@@ -72,11 +72,11 @@ public class Person(string givenName, string surName, string idNum)
         // The control sum is the sum without the last digit
         int controlSum = sum - tempIdNum[9];
         // The control digit is the number that makes the control sum divisible by 10
-        int controlDigit = 10 - (controlSum % 10);
+        int controlDigit = (10 - controlSum % 10) % 10;
         
         // Check if sum is divisible by 10
         // 9th letter is 3rd birth digit (8th index)
-        Gender gender = tempIdNum[8] % 2 == 0 ? Gender.Female : Gender.Male;
+        Gender gender = int.Parse(tempIdStr[8].ToString()) % 2 == 0 ? Gender.Female : Gender.Male;
         return (sum % 10 == 0 && controlDigit == tempIdNum[9], gender);
     }
 }
