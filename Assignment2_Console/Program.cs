@@ -338,6 +338,7 @@ static class Program
         
         // The column writer has all the strings it can figure out all needed padding and spacing for each column
         columnWriter.Write();
+        Console.WriteLine();
     }
     
     static void DumpSalesDataLog(string path)
@@ -345,23 +346,28 @@ static class Program
         // Redirect the console output to a file and print the sales data to 'sales_data.log'
         TextWriter consoleOut = Console.Out;
         
-        FileStream fs = File.Open("sales_data2.temp", FileMode.OpenOrCreate, FileAccess.ReadWrite);
+        FileStream fs = File.Open("sales_data2.temp", FileMode.OpenOrCreate, FileAccess.Write);
         StreamWriter sw = new StreamWriter(fs);
-        StreamReader sr = new StreamReader(fs);
         
         // Empty the file
         fs.SetLength(0);
         Console.SetOut(sw);
         PrintSalesData(path);
-        fs.Seek(0, SeekOrigin.Begin);
-        consoleOut.Write(sr.ReadToEnd());
         sw.Close();
         fs.Close();
         
-        // Overwrite 'sales_data2' with 'sales_data2.temp'
+        // Read the file and print it to the console
+        fs = File.Open("sales_data2.temp", FileMode.OpenOrCreate, FileAccess.Read);
+        StreamReader sr = new StreamReader(fs);
+        string output = sr.ReadToEnd();
+        consoleOut.Write(output);
+        sw.Close();
+        fs.Close();
+        // Overwrite 'sales_data2' with 'sales_data2.temp' if there was output
+        Console.SetOut(consoleOut);
+        if (output.Length == 0) return;
         File.Delete(path);
         File.Move("sales_data2.temp", path);
-        Console.SetOut(consoleOut);
     }
     
     // Simple method to write a message in a specific color
@@ -478,12 +484,14 @@ static class Program
         // Append to 'sales_data' file
         using StreamWriter sw = File.AppendText(path);
         // Temporarily clutter the log file that the program reads, then prints the real output to the log file
-        sw.WriteLine($"{salesPerson.Name} {salesPerson.Id} {salesPerson.District} {salesPerson.Sales} ");
+        sw.WriteLine($"\n{salesPerson.Name} {salesPerson.Id} {salesPerson.District} {salesPerson.Sales} ");
+        sw.Close();
     }
     
     static void Main(string[] args)
     {
         // Create 'sales_data' extensionless file if it doesn't exist
+        /* ** CSV format **
         if (!System.IO.File.Exists("sales_data"))
         {
             FileStream fs = System.IO.File.Create("sales_data");
@@ -493,6 +501,19 @@ static class Program
             sw.Close();
             fs.Close();
         }
+        ** CSV format ** */
+        
+        /* ** Log format ** */
+        if (!File.Exists("sales_data2"))
+        {
+            FileStream fs = File.Create("sales_data2");
+            // Add headers to 'sales_data' file
+            StreamWriter sw = new StreamWriter(fs);
+            sw.WriteLine("Namn Personnummer Distrikt Försäljning ");
+            sw.Close();
+            fs.Close();
+        }
+        /* ** Log format ** */
         
         // Loop until user enters
         bool mainLoop = true;
